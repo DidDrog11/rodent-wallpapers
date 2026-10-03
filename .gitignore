@@ -1,0 +1,7 @@
+data/
+output/
+logs/
+.Rhistory
+.RData
+.Rproj.user/
+CLAUDE.md

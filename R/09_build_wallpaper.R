@@ -1,0 +1,48 @@
+# Assemble the Wallpaper Engine project: the page from wallpaper/, the images,
+# and a manifest of everything the page shows. The manifest is written twice:
+# manifest.js for the page (loaded by a script tag, which works from local
+# files) and manifest.json for other readers such as the life-organiser card.
+
+source(here::here("R", "00_setup.R"))
+
+start_date <- "2026-10-05"   # day one of the rotation
+
+species <- fread(file.path(dir_work, "species.csv"))
+thin <- fread(file.path(dir_work, "thinning_summary.csv"))
+brt <- fread(file.path(dir_work, "brt_summary.csv"))
+arha <- fread(file.path(dir_work, "arha_summary.csv"))
+detections <- fread(file.path(dir_work, "arha_detections.csv"))
+wiki <- fread(file.path(dir_work, "wikipedia.csv"))
+renders <- fread(file.path(dir_work, "renders.csv"))
+doi <- readLines(file.path(dir_work, "gbif_doi.txt"))[1]
+
+entries <- list()
+for (i in seq_len(nrow(species))) {
+  k <- species$speciesKey[i]
+  w <- wiki[speciesKey == k]
+  a <- arha[speciesKey == k]
+  d <- detections[speciesKey == k]
+  r <- renders[speciesKey == k]
+  entries[[i]] <- list(
+    key = k, rank = species$rank[i], species = species$species[i], family = species$family[i],
+    common_name = w$common_name, wiki_url = w$wiki_url, wiki_sentence = w$wiki_sentence,
+    n_gbif = species$n_gbif[i], n_thinned = thin[speciesKey == k]$n_thinned, gbif_doi = doi,
+    top_predictors = brt[speciesKey == k]$top_predictors,
+    hue = r$hue[1], projection = r$projection[1],
+    images = as.list(setNames(r$image, r$screen)),
+    arha = list(studies = a$arha_studies, individuals = a$arha_individuals, tested = a$arha_tested,
+                positive = a$arha_positive,
+                detections = lapply(seq_len(nrow(d)), function(j) as.list(d[j, .(pathogen, n_positive, assays)]))))
+}
+
+manifest <- list(start_date = start_date, built = format(Sys.time(), "%Y-%m-%d %H:%M"), smoke = smoke,
+                 site_colour = site_colour, species = entries)
+manifest_json <- jsonlite::toJSON(manifest, auto_unbox = TRUE, pretty = TRUE, na = "null", null = "null")
+writeLines(manifest_json, file.path(dir_out, "manifest.json"))
+writeLines(c("window.RODENTS = ", manifest_json, ";"), file.path(dir_out, "manifest.js"))
+
+# The page itself, and a preview image for Wallpaper Engine's browser
+file.copy(list.files(here("wallpaper"), full.names = TRUE), dir_out, overwrite = TRUE)
+file.copy(file.path(dir_out, renders[screen == "hd"]$image[1]), file.path(dir_out, "preview.png"), overwrite = TRUE)
+
+message("Wallpaper written to ", dir_out)

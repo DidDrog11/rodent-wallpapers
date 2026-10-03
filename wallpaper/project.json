@@ -1,0 +1,8 @@
+{
+  "file": "index.html",
+  "preview": "preview.png",
+  "title": "Rodent of the day",
+  "description": "A rodent species a day: modelled distribution from GBIF records, with Project ArHa pathogen sampling.",
+  "type": "web",
+  "general": { "properties": {} }
+}

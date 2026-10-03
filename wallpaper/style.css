@@ -1,0 +1,58 @@
+/* Pure black for OLED. Text in dim greys, never in the species hue; the hue
+   appears only on map marks and the legend swatch. */
+:root {
+  --ink-1: #9a9a9a;   /* species name */
+  --ink-2: #6e6e6e;   /* common name, headings */
+  --ink-3: #555555;   /* body */
+  --ink-4: #404040;   /* sources */
+  --hue: #00e5ff;
+  --site: #ffb020;
+}
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-3); }
+
+#map {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  transition: transform 4s ease;
+}
+
+#panel {
+  position: absolute; box-sizing: border-box;
+  transition: transform 6s ease;
+  font-size: clamp(12px, 0.9vmin + 4px, 18px); line-height: 1.45;
+}
+body.uw #panel { font-size: clamp(14px, 1.15vmin + 2px, 19px); }
+/* Ultrawide: a column on the right, clear of the desktop icons on the left */
+body.uw #panel { top: 0; right: 0; width: 24%; height: 100%; padding: 9vh 3.2vw 6vh 1.6vw;
+  display: flex; flex-direction: column; justify-content: center; gap: 1.6em; }
+/* 16:9: a band along the bottom, in three columns */
+body.hd #panel { left: 0; bottom: 0; width: 100%; height: 22%; padding: 1.6vh 3vw 3.2vh;
+  display: grid; grid-template-columns: 1.3fr 1fr 1.1fr; grid-template-rows: auto auto auto 1fr;
+  column-gap: 3vw; align-content: center; }
+body.hd #eyebrow, body.hd #sci, body.hd #common, body.hd #sentence { grid-column: 1; }
+body.hd .legend { grid-column: 2; grid-row: 1 / span 4; align-self: center; }
+body.hd #arha { grid-column: 3; grid-row: 1 / span 3; }
+body.hd #source { grid-column: 3; grid-row: 4; align-self: end; }
+
+.eyebrow { color: var(--ink-4); font-size: 0.8em; letter-spacing: 0.08em; text-transform: uppercase; }
+h1 { margin: 0.1em 0 0; color: var(--ink-1); font-weight: 400; font-style: italic; font-size: 2.1em; line-height: 1.1; }
+.common { color: var(--ink-2); font-size: 1.1em; }
+.sentence { margin: 0.5em 0 0; color: var(--ink-3); max-width: 34em; }
+body.hd .sentence { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.legend { color: var(--ink-3); font-size: 0.85em; }
+.ramp { display: block; height: 6px; width: 18em; max-width: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, #000 0%, var(--hue) 70%, #f4fbff 100%); box-shadow: 0 0 6px -1px var(--hue); }
+.ramp-labels { display: flex; justify-content: space-between; gap: 1em; width: 18em; max-width: 100%; color: var(--ink-4); font-size: 0.85em; margin: 0.3em 0 0.8em; white-space: nowrap; }
+.key { display: flex; align-items: center; gap: 0.6em; }
+.dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.5); margin: 0 3px; }
+.ring { width: 7px; height: 7px; border-radius: 50%; border: 1.2px solid var(--site); box-sizing: border-box; }
+
+.arha h2 { margin: 0 0 0.3em; color: var(--ink-2); font-size: 0.8em; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+.arha .counts { color: var(--ink-3); }
+.arha ul { margin: 0.4em 0 0; padding: 0; list-style: none; }
+.arha li { color: var(--ink-3); }
+.arha li .assay { color: var(--ink-4); }
+.arha .none { color: var(--ink-4); }
+
+.source { color: var(--ink-4); font-size: 0.75em; line-height: 1.5; }
