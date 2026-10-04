@@ -76,3 +76,6 @@ set.seed(20261004)
 globe_frames <- 48
 globe_px <- 320
 globe_cols <- 8
+
+# The big globe for species found round the world, one image per view
+big_globe_px <- 1400

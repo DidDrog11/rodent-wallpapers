@@ -5,7 +5,7 @@
 
 source(here::here("R", "00_setup.R"))
 
-start_date <- "2026-10-05"   # day one of the rotation
+start_date <- "2026-10-04"   # day one of the rotation
 
 species <- fread(file.path(dir_work, "species.csv"))
 thin <- fread(file.path(dir_work, "thinning_summary.csv"))
@@ -23,6 +23,12 @@ web <- readRDS(file.path(dir_work, "web.rds"))
 # Years the records span, for the replay counter
 occ <- readRDS(file.path(dir_work, "occurrences_thinned.rds"))
 occ_years <- split(occ$year, occ$speciesKey)
+
+# The big globe view (0-based) facing the circular mean longitude of the records
+big_globe_start <- function(lon) {
+  centre <- atan2(mean(sin(lon * pi / 180)), mean(cos(lon * pi / 180))) * 180 / pi
+  round(((180 - centre) %% 360) / (360 / globe_frames)) %% globe_frames
+}
 
 entries <- list()
 for (i in seq_len(nrow(species))) {
@@ -56,9 +62,14 @@ for (i in seq_len(nrow(species))) {
     images = as.list(setNames(r$image, r$screen)),
     points = as.list(setNames(r$points, r$screen)),
     year_range = range(occ_years[[as.character(k)]], na.rm = TRUE),
-    globe = if (is.na(r$globe[1])) NULL else list(
+    globe = if (is.na(r$globe[1]) || !nzchar(r$globe[1])) NULL else list(
       sprite = r$globe[1], frames = globe_frames, cols = globe_cols, frame_px = globe_px,
       place = lapply(setNames(seq_len(nrow(r)), r$screen), function(j) list(x = r$globe_x[j], y = r$globe_y[j], size = r$globe_size[j]))),
+    big_globe = if (is.na(r$big_globe[1]) || !nzchar(r$big_globe[1])) NULL else list(
+      frames = strsplit(r$big_globe[1], ";")[[1]],
+      # Start facing the records: frame f is centred on longitude 180 - (f - 1) * 360 / globe_frames
+      start = big_globe_start(occ[speciesKey == k]$lon),
+      place = lapply(setNames(seq_len(nrow(r)), r$screen), function(j) list(x = r$big_x[j], y = r$big_y[j], size = r$big_size[j]))),
     silhouette = web[[as.character(k)]]$silhouette,
     card_images = list(wikipedia = web[[as.character(k)]]$wiki_image, inaturalist = web[[as.character(k)]]$inat_photos),
     arha = list(studies = a$arha_studies, individuals = a$arha_individuals, tested = a$arha_tested,

@@ -13,11 +13,11 @@ if (!file.exists(pred_file)) {
 }
 
 # Hillshade from the elevation layer, lit from the north-west, for shading
-# land. Elevation is exaggerated eightfold: at 5' a cell is about 9 km across,
+# land. Elevation is exaggerated twentyfold: at 5' a cell is about 9 km across,
 # so real slopes come out nearly flat and the relief would not show.
-shade_file <- file.path(dir_pred, "hillshade_z8.tif")
+shade_file <- file.path(dir_pred, "hillshade_z20.tif")
 if (!file.exists(shade_file)) {
-  elev <- rast(pred_file)[["elev"]] * 8
+  elev <- rast(pred_file)[["elev"]] * 20
   slope_aspect <- terrain(elev, v = c("slope", "aspect"), unit = "radians")
   hill <- shade(slope_aspect[["slope"]], slope_aspect[["aspect"]], angle = 40, direction = 315)
   writeRaster(hill, shade_file)

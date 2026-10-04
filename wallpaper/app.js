@@ -100,7 +100,7 @@
 
     // Records and globe only change with the species or the window size
     const motionKey = `${sp.key} ${screen} ${window.innerWidth}x${window.innerHeight}`;
-    if (motionKey !== shownMotion) { shownMotion = motionKey; showRecords(sp, screen); showGlobe(sp, screen); }
+    if (motionKey !== shownMotion) { shownMotion = motionKey; showRecords(sp, screen); showGlobe(sp, screen); showBigGlobe(sp, screen); }
   }
 
   // ---- Records: drawn by the page so they can be replayed by year -----------
@@ -218,7 +218,7 @@
   function showGlobe(sp, screen) {
     clearInterval(globeTimer);
     const g = sp.globe, el = $("globe");
-    if (!g || !g.place || !g.place[screen]) { el.style.display = "none"; return; }
+    if (!g || !g.place || !g.place[screen] || !(g.frames || g.sprite)) { el.style.display = "none"; return; }
     const place = g.place[screen], size = window.RODENT_SCREENS[screen];
     const sx = window.innerWidth / size.width, sy = window.innerHeight / size.height;
     const side = place.size * Math.min(sx, sy);
@@ -241,6 +241,36 @@
       frames[front].style.opacity = 0;
       front = 1 - front;
     }, 2500);
+  }
+
+  // ---- Big globe: one image per view, the next preloaded, cross-faded --------
+  // One turn in globe frames x 5 seconds (four minutes for 48 views).
+  let bigTimer = null;
+  function showBigGlobe(sp, screen) {
+    clearInterval(bigTimer);
+    const g = sp.big_globe, el = $("bigglobe");
+    if (!g || !g.place || !g.place[screen] || !g.frames || !g.frames.length) { el.style.display = "none"; return; }
+    const place = g.place[screen], size = window.RODENT_SCREENS[screen];
+    const sx = window.innerWidth / size.width, sy = window.innerHeight / size.height;
+    const side = place.size * Math.min(sx, sy);
+    Object.assign(el.style, { display: "block", left: `${(place.x + place.size / 2) * sx - side / 2}px`, top: `${place.y * sy}px`,
+                              width: `${side}px`, height: `${side}px` });
+    const views = el.querySelectorAll(".view");
+    let i = g.start || 0, front = 0;
+    views[0].src = g.frames[i];
+    views[0].style.opacity = 1;
+    views[1].style.opacity = 0;
+    let preload = new Image();
+    preload.src = g.frames[(i + 1) % g.frames.length];
+    bigTimer = setInterval(() => {
+      if (document.hidden) return;
+      i = (i + 1) % g.frames.length;
+      const next = views[1 - front];
+      next.onload = () => { next.style.opacity = 1; views[front].style.opacity = 0; front = 1 - front; next.onload = null; };
+      next.src = g.frames[i];
+      preload = new Image();
+      preload.src = g.frames[(i + 1) % g.frames.length];
+    }, 5000);
   }
 
   if (!data || !data.species || !data.species.length) {

@@ -16,16 +16,20 @@
 source(here::here("R", "00_setup.R"))
 
 species <- fread(file.path(dir_work, "species.csv"))
+# RW_ONLY=key1,key2 re-renders just those species and keeps the others' rows
+only <- Sys.getenv("RW_ONLY", "")
+if (nzchar(only)) species <- species[speciesKey %in% as.integer(strsplit(only, ",")[[1]])]
 occ <- readRDS(file.path(dir_work, "occurrences_thinned.rds"))
 sites <- fread(file.path(dir_work, "arha_sites.csv"))
 countries <- vect(file.path(dir_pred, "gadm_countries.gpkg"))
-hillshade <- rast(file.path(dir_pred, "hillshade_z8.tif"))
+hillshade <- rast(file.path(dir_pred, "hillshade_z20.tif"))
 iucn_file <- file.path(dir_work, "iucn_ranges.gpkg")
 iucn <- if (file.exists(iucn_file)) vect(iucn_file) else NULL
 
-land_level <- 0.04         # land brightness on flat ground; slopes run from about a sixth to two and a half times this
+land_level <- 0.04         # land brightness on flat ground; slopes run from a tenth to about three times this
 flat_shade <- sin(40 * pi / 180)  # hillshade of flat ground for a 40-degree sun
 coast_tint <- c(0.012, 0.022, 0.05)  # faint deep blue in the sea near coasts
+sphere_sea <- c(0.010, 0.016, 0.034) # the sea on the big globe, just above black
 border_colour <- "#2b2b2b"
 range_colour <- adjustcolor("#d0d0d0", 0.4)
 frame_colour <- "#1c1c1c"
@@ -95,7 +99,7 @@ blur <- function(x, tmpl, sigma_cells) {
 # Colour one panel: land a shade above black and lit by the terrain, a faint
 # blue haze in the sea along coasts, suitability in the hue rising to near
 # white at the top of the scale, and a halo in the hue from a blurred copy
-compose_panel <- function(suit, crs_map, panel_ext, w, h, borders, hue_rgb, mask = "none") {
+compose_panel <- function(suit, crs_map, panel_ext, w, h, borders, hue_rgb, mask = "none", sphere = FALSE) {
   tmpl <- rast(panel_ext, ncols = w, nrows = h, crs = crs_map)
   s_map <- subst(project(suit, tmpl, method = "bilinear"), NA, 0)
   # Outside the Equal Earth outline the inverse projection wraps round and
@@ -110,7 +114,7 @@ compose_panel <- function(suit, crs_map, panel_ext, w, h, borders, hue_rgb, mask
   land <- rasterize(borders, tmpl, field = 1, background = 0)
   coast <- blur(land, tmpl, 3) * (1 - land)
   if (!is.null(inside)) coast <- coast * inside
-  relief <- clamp(subst(project(hillshade, tmpl, method = "bilinear"), NA, flat_shade) / flat_shade, 0.15, 2.6)
+  relief <- clamp(subst(project(hillshade, tmpl, method = "bilinear"), NA, flat_shade) / flat_shade, 0.1, 3.2)
 
   v <- values(s_map, mat = FALSE)
   g <- values(glow, mat = FALSE)
@@ -119,11 +123,19 @@ compose_panel <- function(suit, crs_map, panel_ext, w, h, borders, hue_rgb, mask
   rl <- values(relief, mat = FALSE)
   a <- v^1.4
   white <- 0.65 * v^5
-  lit <- pmin(1.25, 0.62 + 0.38 * rl)   # the glow takes the terrain light too, so mountains show through it
+  lit <- pmin(1.35, 0.5 + 0.5 * rl)   # the glow takes the terrain light too, so mountains show through it
+  # A sphere: a faint deep-blue sea inside the disc, darkening towards the rim
+  sea <- 0
+  limb <- 1
+  if (sphere) {
+    r2 <- values((init(tmpl, "x")^2 + init(tmpl, "y")^2) / earth_radius^2, mat = FALSE)
+    sea <- as.numeric(r2 <= 1)
+    limb <- ifelse(r2 <= 1, 0.4 + 0.6 * sqrt(pmax(0, 1 - r2)), 0)
+  }
   rgb_vals <- matrix(0, nrow = length(v), ncol = 3)
   for (ch in 1:3) {
-    base <- land_level * l * rl + coast_tint[ch] * co
-    rgb_vals[, ch] <- pmin(1, base * (1 - a) + (hue_rgb[ch] * (1 - white) + white) * a * lit + hue_rgb[ch] * g * 0.5)
+    base <- land_level * l * rl + coast_tint[ch] * co + sphere_sea[ch] * sea * (1 - l)
+    rgb_vals[, ch] <- pmin(1, (base * (1 - a) + (hue_rgb[ch] * (1 - white) + white) * a * lit + hue_rgb[ch] * g * 0.5) * limb)
   }
   rgb_map <- rast(tmpl, nlyrs = 3)
   values(rgb_map) <- rgb_vals * 255
@@ -179,6 +191,32 @@ render_globe <- function(suit, hue_rgb, lat0, file) {
     lines(earth_radius * cos(rim), earth_radius * sin(rim), col = "#2a2a2a", lwd = 1)
   }
   dev.off()
+}
+
+# The big globe for species found round the world: globe_frames views as
+# separate images, so the page holds only the two it is cross-fading between.
+# Records and ArHa sites are drawn on the globe, so they turn with it.
+render_big_globe <- function(suit, hue_rgb, rec_colour, pres_ll, site_ll, lat0, k) {
+  r <- earth_radius * 1.02
+  rim <- seq(0, 2 * pi, length.out = 360)
+  files <- character(globe_frames)
+  for (f in seq_len(globe_frames)) {
+    lon0 <- 180 - (f - 1) * 360 / globe_frames
+    crs_o <- sprintf("+proj=ortho +lat_0=%d +lon_0=%.1f +datum=WGS84 +units=m", round(lat0), lon0)
+    hemisphere <- buffer(vect(cbind(lon0, lat0), crs = "EPSG:4326"), width = 9.6e6)
+    borders <- project(crop(countries, hemisphere), crs_o)
+    visible <- function(v) if (is.null(v)) NULL else project(crop(v, hemisphere), crs_o)
+    rgb_globe <- compose_panel(suit, crs_o, ext(-r, r, -r, r), big_globe_px, big_globe_px, borders, hue_rgb, mask = "disc", sphere = TRUE)
+    files[f] <- file.path(dir_img, sprintf("bigglobe_%s_%02d.png", k, f))
+    ragg::agg_png(files[f], width = big_globe_px, height = big_globe_px, units = "px", background = "black")
+    draw_panel(rgb_globe, list(x0 = 0, y0 = 0, w = big_globe_px, h = big_globe_px), big_globe_px, big_globe_px,
+               borders, NULL, visible(site_ll), 0.8 * big_globe_px / 1080, first = TRUE)
+    pres_v <- visible(pres_ll)
+    if (!is.null(pres_v)) points(pres_v, pch = 16, cex = 0.18, col = adjustcolor(rec_colour, 0.55))
+    lines(earth_radius * cos(rim), earth_radius * sin(rim), col = "#2a2a2a", lwd = 1.2)
+    dev.off()
+  }
+  file.path("img", basename(files))
 }
 
 # Panel rectangles inside the map part of the screen: one large panel on the
@@ -246,10 +284,22 @@ for (i in seq_len(nrow(species))) {
     # mouse) the species gets a single world map. When there is only one
     # region and it spans a wide continent (red squirrel), a single map of it.
     region_xy <- cell_xy[group == ranked$region[1], , drop = FALSE]
-    if (diff(range(region_xy[, 1])) > 200) {
+    main_records <- pres_dt[region == ranked$region[1]]
+    if (diff(range(region_xy[, 1])) > 200 && mean(main_records$lat > 20) >= 0.95) {
+      # Records chain round the pole but stay in the north (muskrat): a north
+      # polar map, with any other regions as small insets in its corner
+      layout_mode <- "polar"
+      lon_mid <- atan2(mean(sin(main_records$lon * pi / 180)), mean(cos(main_records$lon * pi / 180))) * 180 / pi
+      crs_p <- sprintf("+proj=laea +lat_0=90 +lon_0=%d +datum=WGS84 +units=m", round(lon_mid))
+      corners <- rbind(region_xy + 1.5, region_xy - 1.5)
+      corners[, 2] <- pmax(0, pmin(89, corners[, 2]))
+      polar <- list(crs = crs_p, window = ext(-180, 180, -5, 90), focus = ext(project(vect(corners, crs = "EPSG:4326"), crs_p)), label = NULL)
+      regions <- c(list(polar), regions[-1])
+      projection_label <- "North polar Lambert azimuthal equal-area"
+    } else if (diff(range(region_xy[, 1])) > 200) {
       layout_mode <- "world"
       regions <- list(list(crs = eqearth, window = NULL, focus = ext(project(globe, eqearth)), label = NULL))
-      projection_label <- "Equal Earth"
+      projection_label <- "Orthographic globe, turning"
     } else if (length(regions) == 1) {
       layout_mode <- "single"
       regions[[1]] <- single_region(range(region_xy[, 1]) + c(-1.5, 1.5), range(region_xy[, 2]) + c(-1.5, 1.5), region_xy)
@@ -269,6 +319,11 @@ for (i in seq_len(nrow(species))) {
     globe_file <- file.path(dir_img, paste0("globe_", k, ".png"))
     render_globe(suit, hue_rgb, max(-30, min(40, mean(pres_dt$lat))), globe_file)
   }
+  # Species found round the world get the big globe in place of a flat map
+  big_globe_files <- NULL
+  if (layout_mode == "world") {
+    big_globe_files <- render_big_globe(suit, hue_rgb, record_colour(hue), pres_ll, site_ll, 15, k)
+  }
 
   for (scr in names(screens)) {
     s <- screens[[scr]]
@@ -282,8 +337,14 @@ for (i in seq_len(nrow(species))) {
     ragg::agg_png(img_file, width = W, height = H, units = "px", background = "black")
     on_screen <- list()
     globe_rect <- NULL
+    big_place <- NULL
 
-    if (layout_mode != "panels") {
+    if (layout_mode == "world") {
+      # The page lays the big globe over the map area; the image itself stays black
+      plot.new()
+      side <- map_area$h - 2 * gap_px
+      big_place <- list(x = map_area$x0 + round((map_area$w - side) / 2), y = map_area$y0 + gap_px, size = side)
+    } else if (layout_mode != "panels") {
       # One map over the whole screen, with the species (or the world) fitted
       # into the map area
       reg <- regions[[1]]
@@ -302,6 +363,30 @@ for (i in seq_len(nrow(species))) {
                  if (is.null(site_ll)) NULL else project(site_ll, reg$crs), site_cex, first = TRUE,
                  range_v = project_for(range_ll, reg$crs, reg$window))
       on_screen[[1]] <- points_on_screen(project(pres_ll, reg$crs), screen_ext, full_rect)
+
+      # Polar layout: other regions as small framed insets, stacked up from the
+      # bottom-left corner of the map area
+      if (layout_mode == "polar" && length(regions) > 1) {
+        inset_w <- round(map_area$w * 0.2)
+        inset_h <- round(inset_w * 0.8)
+        for (j in 2:length(regions)) {
+          reg_j <- regions[[j]]
+          rect_j <- list(x0 = map_area$x0 + gap_px, y0 = map_area$y0 + map_area$h - (j - 1) * (inset_h + gap_px), w = inset_w, h = inset_h)
+          inset_ext <- fit_extent(reg_j$focus, inset_w, inset_h, 0.08)
+          borders_j <- borders_for(reg_j$crs, reg_j$window)
+          rgb_inset <- compose_panel(suit, reg_j$crs, inset_ext, inset_w, inset_h, borders_j, hue_rgb)
+          draw_panel(rgb_inset, rect_j, W, H, borders_j, NULL,
+                     if (is.null(site_ll)) NULL else project(site_ll, reg_j$crs), site_cex,
+                     label = reg_j$label, frame = TRUE, range_v = project_for(range_ll, reg_j$crs, reg_j$window))
+          on_screen[[j]] <- points_on_screen(project(pres_ll, reg_j$crs), inset_ext, rect_j)
+        }
+        # Records under an inset belong to the inset, not to the map behind it
+        under <- function(p, r) p$x >= r$x0 & p$x < r$x0 + r$w & p$y >= r$y0 & p$y < r$y0 + r$h
+        for (j in 2:length(regions)) {
+          rect_j <- list(x0 = map_area$x0 + gap_px, y0 = map_area$y0 + map_area$h - (j - 1) * (inset_h + gap_px), w = inset_w, h = inset_h)
+          on_screen[[1]] <- on_screen[[1]][!under(on_screen[[1]], rect_j)]
+        }
+      }
     } else {
       # A panel per region, and a place for the globe in the main panel's corner
       rects <- layout_panels(length(regions), map_area)
@@ -323,7 +408,7 @@ for (i in seq_len(nrow(species))) {
     dev.off()
 
     # Records for the page to draw and replay, oldest first
-    pts <- rbindlist(on_screen)[order(year, na.last = FALSE)]
+    pts <- if (length(on_screen)) rbindlist(on_screen)[order(year, na.last = FALSE)] else data.table(x = numeric(), y = numeric(), year = integer())
     pts_file <- file.path(dir_out, "pts", paste0(k, "_", scr, ".js"))
     dir.create(dirname(pts_file), showWarnings = FALSE)
     writeLines(sprintf('window.RODENT_POINTS = {x: [%s], y: [%s], year: [%s]};',
@@ -337,10 +422,18 @@ for (i in seq_len(nrow(species))) {
                                                  globe = if (is.na(globe_file)) NA_character_ else file.path("img", basename(globe_file)),
                                                  globe_x = if (is.null(globe_rect)) NA else globe_rect$x,
                                                  globe_y = if (is.null(globe_rect)) NA else globe_rect$y,
-                                                 globe_size = if (is.null(globe_rect)) NA else globe_rect$size)
+                                                 globe_size = if (is.null(globe_rect)) NA else globe_rect$size,
+                                                 big_globe = if (is.null(big_globe_files)) NA_character_ else paste(big_globe_files, collapse = ";"),
+                                                 big_x = if (is.null(big_place)) NA else big_place$x,
+                                                 big_y = if (is.null(big_place)) NA else big_place$y,
+                                                 big_size = if (is.null(big_place)) NA else big_place$size)
   }
   message("Rendered ", species$species[i], ": ", projection_label)
 }
 
 render_summary <- rbindlist(renders)
+if (nzchar(only)) {
+  earlier <- fread(file.path(dir_work, "renders.csv"))
+  render_summary <- rbind(earlier[!speciesKey %in% render_summary$speciesKey], render_summary, fill = TRUE)
+}
 fwrite(render_summary, file.path(dir_work, "renders.csv"))
