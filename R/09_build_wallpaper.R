@@ -50,7 +50,7 @@ for (i in seq_len(nrow(species))) {
     common_name = w$common_name, wiki_url = w$wiki_url, wiki_sentence = w$wiki_sentence,
     n_gbif = species$n_gbif[i], n_thinned = thin[speciesKey == k]$n_thinned, gbif_doi = doi,
     top_predictors = brt[speciesKey == k]$top_predictors,
-    hue = r$hue[1], projection = r$projection[1], has_iucn_range = isTRUE(r$has_range[1]),
+    hue = r$hue[1], record_colour = record_colour(r$hue[1]), projection = r$projection[1], has_iucn_range = isTRUE(r$has_range[1]),
     importance = top_importance, months = months,
     traits = lapply(seq_len(nrow(tr)), function(j) list(label = tr$label[j], value = tr$value[j])),
     images = as.list(setNames(r$image, r$screen)),

@@ -42,6 +42,11 @@ screens <- list(
 # colour for colour-blind separation.
 family_hues <- c(Sciuridae = "#00e5ff", Cricetidae = "#9b7bff", Muridae = "#ff3df0", Castoridae = "#3d9bff")
 other_hue <- "#4dffa6"
+
+# Neon for the GBIF records, chosen to stand apart from the glow: hot pink,
+# or neon yellow on murid (magenta) days. Checked against every hue and the
+# site colour for colour-blind and normal-vision separation.
+record_colour <- function(hue) if (hue == family_hues[["Muridae"]]) "#f4ff52" else "#ff5c8a"
 site_colour <- "#ffb020"
 
 # Plain names for the predictors, for the variable importance bars

@@ -6,6 +6,7 @@
   --ink-3: #555555;   /* body */
   --ink-4: #404040;   /* labels, sources */
   --hue: #00e5ff;
+  --rec: #ff5c8a;
   --site: #ffb020;
 }
 html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
@@ -70,7 +71,7 @@ body.hd .season svg { width: 4.8em; height: 4.8em; }
   background: linear-gradient(90deg, #000 0%, var(--hue) 70%, #f4fbff 100%); box-shadow: 0 0 6px -1px var(--hue); }
 .ramp-labels { display: flex; justify-content: space-between; gap: 1em; width: 18em; max-width: 100%; color: var(--ink-4); font-size: 0.85em; margin: 0.3em 0 0.8em; white-space: nowrap; }
 .key { display: flex; align-items: center; gap: 0.6em; }
-.dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.5); margin: 0 3px; }
+.dot { width: 3px; height: 3px; border-radius: 50%; background: var(--rec); opacity: 0.8; margin: 0 3px; }
 .ring { width: 7px; height: 7px; border-radius: 50%; border: 1.2px solid var(--site); box-sizing: border-box; }
 .dash { width: 9px; border-top: 1.5px dashed rgba(208,208,208,0.55); }
 

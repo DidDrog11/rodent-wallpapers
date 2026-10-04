@@ -29,6 +29,7 @@
     const screen = window.innerWidth / window.innerHeight > 2 ? "uw" : "hd";
     document.body.className = screen;
     document.documentElement.style.setProperty("--hue", sp.hue);
+    document.documentElement.style.setProperty("--rec", sp.record_colour || "#ff5c8a");
     document.documentElement.style.setProperty("--site", data.site_colour);
 
     $("map").src = sp.images[screen];
@@ -101,9 +102,14 @@
 
   // ---- Records: drawn by the page so they can be replayed by year -----------
   // The image's pixel grid is stretched to the window, so positions scale.
+  // Records wear their own neon (--rec), chosen to stand apart from the glow.
   let shownMotion = "";
-  let pts = null, scale = { x: 1, y: 1 }, replaying = false;
-  const REPLAY_MS = 50000, FLARE_MS = 1300, EVERY_MS = 10 * 60000;
+  let pts = null, scale = { x: 1, y: 1 };
+  let run = null;   // the replay in progress: { id, start, drawn, undated, active }
+  let runs = 0;
+  // ?replay=SECONDS in the address shortens the replay for previews; Wallpaper Engine never sets it
+  const REPLAY_MS = (Number(new URLSearchParams(location.search).get("replay")) || 180) * 1000;
+  const FLARE_MS = 2500, EVERY_MS = 15 * 60000, DOT_ALPHA = 0.55;
 
   function sizeCanvas(c) {
     const dpr = window.devicePixelRatio || 1;
@@ -113,12 +119,18 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     return ctx;
   }
+  const recColour = () => getComputedStyle(document.documentElement).getPropertyValue("--rec").trim();
   function dot(ctx, i) {
     ctx.fillRect(pts.x[i] * scale.x - 0.8, pts.y[i] * scale.y - 0.8, 1.6, 1.6);
   }
+  function dotsContext(clear) {
+    const ctx = clear ? sizeCanvas($("dots")) : $("dots").getContext("2d");
+    ctx.fillStyle = recColour();
+    ctx.globalAlpha = DOT_ALPHA;
+    return ctx;
+  }
   function drawAllDots() {
-    const ctx = sizeCanvas($("dots"));
-    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    const ctx = dotsContext(true);
     for (let i = 0; i < pts.x.length; i++) dot(ctx, i);
   }
 
@@ -126,6 +138,8 @@
     const size = window.RODENT_SCREENS[screen];
     scale = { x: window.innerWidth / size.width, y: window.innerHeight / size.height };
     pts = null;
+    run = null;
+    $("replay").textContent = "";
     sizeCanvas($("flares"));
     sizeCanvas($("dots"));
     const old = document.getElementById("points-script");
@@ -138,45 +152,62 @@
     document.body.appendChild(s);
   }
 
-  // Replay: records appear oldest first at a steady rate, each with a brief
-  // flare in the species' hue, and a counter shows the year reached. The
-  // canvas then holds still until the next replay, so the GPU idles.
+  // Replay: records appear oldest first at a steady rate, each with a slow,
+  // soft flare, and a counter shows the year reached. Progress follows the
+  // clock, not the frame count, so if Wallpaper Engine pauses the page part
+  // way through, the replay catches up when it resumes; a watchdog finishes
+  // any replay that has stalled. Between replays nothing is redrawn.
   function replay() {
-    if (!pts || replaying || document.hidden) return;
-    replaying = true;
-    const dots = sizeCanvas($("dots"));
-    const flares = sizeCanvas($("flares"));
-    dots.fillStyle = "rgba(255,255,255,0.45)";
-    const hue = getComputedStyle(document.documentElement).getPropertyValue("--hue").trim();
+    if (!pts || run || document.hidden) return;
+    const dots = dotsContext(true);
     const n = pts.x.length;
     let undated = 0;
     while (undated < n && pts.year[undated] == null) dot(dots, undated++);
-    let drawn = undated, active = [], t0 = null, lastFrame = 0;
-    function frame(t) {
-      if (t0 === null) t0 = t;
-      if (t - lastFrame < 33) { requestAnimationFrame(frame); return; }   // about 30 frames a second
-      lastFrame = t;
-      const target = Math.min(n, undated + Math.floor((n - undated) * (t - t0) / REPLAY_MS));
-      for (; drawn < target; drawn++) { dot(dots, drawn); active.push([drawn, t]); }
-      flares.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      flares.fillStyle = hue;
-      active = active.filter(([i, born]) => {
-        const age = (t - born) / FLARE_MS;
-        if (age >= 1) return false;
-        flares.globalAlpha = 0.85 * (1 - age);
-        flares.beginPath();
-        flares.arc(pts.x[i] * scale.x, pts.y[i] * scale.y, 0.8 + 2.4 * (1 - age), 0, 2 * Math.PI);
-        flares.fill();
-        return true;
-      });
-      flares.globalAlpha = 1;
-      if (drawn > undated) $("replay").textContent = `Records appearing by year · ${pts.year[drawn - 1]}`;
-      if (drawn < n || active.length) { requestAnimationFrame(frame); return; }
-      replaying = false;
-      setTimeout(() => { $("replay").textContent = ""; }, 4000);
-    }
-    requestAnimationFrame(frame);
+    run = { id: ++runs, start: performance.now(), drawn: undated, undated, active: [] };
+    requestAnimationFrame((t) => frame(t, run.id));
   }
+
+  function finish(id) {
+    if (!run || run.id !== id) return;
+    const dots = dotsContext(false);
+    for (; run.drawn < pts.x.length; run.drawn++) dot(dots, run.drawn);
+    sizeCanvas($("flares"));
+    run = null;
+    setTimeout(() => { if (!run) $("replay").textContent = ""; }, 6000);
+  }
+
+  let lastFrame = 0;
+  function frame(t, id) {
+    if (!run || run.id !== id) return;   // a newer replay or a new species took over
+    if (t - lastFrame < 50) { requestAnimationFrame((u) => frame(u, id)); return; }   // about 20 frames a second
+    lastFrame = t;
+    const n = pts.x.length, elapsed = t - run.start;
+    if (elapsed > REPLAY_MS + FLARE_MS) { finish(id); return; }   // resumed after a long pause: just complete it
+    const target = Math.min(n, run.undated + Math.floor((n - run.undated) * elapsed / REPLAY_MS));
+    const dots = dotsContext(false);
+    const catchingUp = target - run.drawn > 200;   // after a short pause: no burst of flares
+    for (; run.drawn < target; run.drawn++) { dot(dots, run.drawn); if (!catchingUp) run.active.push([run.drawn, t]); }
+    const flares = $("flares").getContext("2d");
+    flares.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    flares.fillStyle = recColour();
+    run.active = run.active.filter(([i, born]) => {
+      const age = (t - born) / FLARE_MS;
+      if (age >= 1) return false;
+      flares.globalAlpha = 0.6 * (1 - age) * (1 - age);
+      flares.beginPath();
+      flares.arc(pts.x[i] * scale.x, pts.y[i] * scale.y, 0.8 + 1.6 * (1 - age), 0, 2 * Math.PI);
+      flares.fill();
+      return true;
+    });
+    flares.globalAlpha = 1;
+    if (run.drawn > run.undated) $("replay").textContent = `Records appearing by year · ${pts.year[run.drawn - 1]}`;
+    if (run.drawn < n || run.active.length) { requestAnimationFrame((u) => frame(u, id)); return; }
+    finish(id);
+  }
+
+  // Watchdog: a replay that has run well past its length has stalled (the page
+  // was hidden mid-way and frames stopped), so complete it.
+  setInterval(() => { if (run && performance.now() - run.start > REPLAY_MS + FLARE_MS + 30000) finish(run.id); }, 30000);
   setInterval(replay, EVERY_MS);
 
   // ---- Globe: a sprite of frames round the world, cross-faded every few seconds
