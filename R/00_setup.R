@@ -22,6 +22,8 @@ smoke_ranks <- c(3L, 8L)   # grey squirrel (global), bank vole (regional, ArHa h
 res_arcmin <- 5               # WorldClim resolution, about 9 km at the equator
 country_fraction <- 0.2       # share of records kept per species and country
 max_uncertainty_m <- 20000    # drop records less precise than this, where stated
+cluster_km <- 1500            # records closer than this belong to one region
+min_cluster_records <- 15     # smaller detached regions are treated as strays
 
 # Model
 access_km <- 500              # accessible area: within this distance of a presence
@@ -35,10 +37,22 @@ screens <- list(
   uw = list(width = 3440, height = 1440, text_side = "right", text_share = 0.24),
   hd = list(width = 1920, height = 1080, text_side = "bottom", text_share = 0.22))
 
-# Neon hues, one per species in turn, and the fixed colour for ArHa sites.
-# Each hue was checked against the site colour for colour-blind separation.
-hues <- c("#00e5ff", "#ff3df0", "#9b7bff", "#3d9bff", "#4dffa6")
+# Neon hue by family, so a colour comes to mean a family over the month, and
+# the fixed colour for ArHa sites. Each hue was checked against the site
+# colour for colour-blind separation.
+family_hues <- c(Sciuridae = "#00e5ff", Cricetidae = "#9b7bff", Muridae = "#ff3df0", Castoridae = "#3d9bff")
+other_hue <- "#4dffa6"
 site_colour <- "#ffb020"
+
+# Plain names for the predictors, for the variable importance bars
+predictor_labels <- c(
+  bio1 = "Mean annual temp.", bio2 = "Daily temp. range", bio3 = "Isothermality",
+  bio4 = "Temp. seasonality", bio5 = "Hottest month max.", bio6 = "Coldest month min.",
+  bio7 = "Annual temp. range", bio8 = "Wettest quarter temp.", bio9 = "Driest quarter temp.",
+  bio10 = "Warmest quarter temp.", bio11 = "Coldest quarter temp.", bio12 = "Annual rainfall",
+  bio13 = "Wettest month rain", bio14 = "Driest month rain", bio15 = "Rainfall seasonality",
+  bio16 = "Wettest quarter rain", bio17 = "Driest quarter rain", bio18 = "Warmest quarter rain",
+  bio19 = "Coldest quarter rain", elev = "Elevation")
 
 # Paths. Smoke runs keep their own data so they can never feed the real run.
 run_name <- if (smoke) "smoke" else "full"

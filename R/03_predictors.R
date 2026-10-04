@@ -12,6 +12,15 @@ if (!file.exists(pred_file)) {
   writeRaster(c(bio, elev), pred_file)
 }
 
+# Hillshade from the elevation layer, lit from the north-west, for shading land
+shade_file <- file.path(dir_pred, "hillshade.tif")
+if (!file.exists(shade_file)) {
+  elev <- rast(pred_file)[["elev"]]
+  slope_aspect <- terrain(elev, v = c("slope", "aspect"), unit = "radians")
+  hill <- shade(slope_aspect[["slope"]], slope_aspect[["aspect"]], angle = 40, direction = 315)
+  writeRaster(hill, shade_file)
+}
+
 # GADM country outlines (level 0), simplified by geodata for small-scale maps
 border_file <- file.path(dir_pred, "gadm_countries.gpkg")
 if (!file.exists(border_file)) {

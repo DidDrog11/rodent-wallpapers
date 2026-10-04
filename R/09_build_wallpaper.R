@@ -14,6 +14,9 @@ arha <- fread(file.path(dir_work, "arha_summary.csv"))
 detections <- fread(file.path(dir_work, "arha_detections.csv"))
 wiki <- fread(file.path(dir_work, "wikipedia.csv"))
 renders <- fread(file.path(dir_work, "renders.csv"))
+importance <- fread(file.path(dir_work, "brt_importance.csv"))
+seasonality <- fread(file.path(dir_work, "seasonality.csv"))
+traits <- fread(file.path(dir_work, "traits.csv"))
 doi <- readLines(file.path(dir_work, "gbif_doi.txt"))[1]
 
 entries <- list()
@@ -23,12 +26,28 @@ for (i in seq_len(nrow(species))) {
   a <- arha[speciesKey == k]
   d <- detections[speciesKey == k]
   r <- renders[speciesKey == k]
+
+  # Top six predictors by relative influence, in plain words
+  imp <- importance[speciesKey == k][order(-rel_inf)][1:6]
+  imp <- imp[!is.na(variable)]
+  top_importance <- lapply(seq_len(nrow(imp)), function(j) list(label = unname(predictor_labels[imp$variable[j]]),
+                                                                value = round(imp$rel_inf[j], 1)))
+
+  # Records in each calendar month, January first
+  by_month <- seasonality[speciesKey == k]
+  months <- by_month$N[match(1:12, by_month$month)]
+  months[is.na(months)] <- 0
+
+  tr <- traits[speciesKey == k]
+
   entries[[i]] <- list(
     key = k, rank = species$rank[i], species = species$species[i], family = species$family[i],
     common_name = w$common_name, wiki_url = w$wiki_url, wiki_sentence = w$wiki_sentence,
     n_gbif = species$n_gbif[i], n_thinned = thin[speciesKey == k]$n_thinned, gbif_doi = doi,
     top_predictors = brt[speciesKey == k]$top_predictors,
-    hue = r$hue[1], projection = r$projection[1],
+    hue = r$hue[1], projection = r$projection[1], has_iucn_range = isTRUE(r$has_range[1]),
+    importance = top_importance, months = months,
+    traits = lapply(seq_len(nrow(tr)), function(j) list(label = tr$label[j], value = tr$value[j])),
     images = as.list(setNames(r$image, r$screen)),
     arha = list(studies = a$arha_studies, individuals = a$arha_individuals, tested = a$arha_tested,
                 positive = a$arha_positive,

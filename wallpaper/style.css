@@ -1,44 +1,69 @@
 /* Pure black for OLED. Text in dim greys, never in the species hue; the hue
-   appears only on map marks and the legend swatch. */
+   appears only on map marks, the legend swatch and chart marks. */
 :root {
   --ink-1: #9a9a9a;   /* species name */
-  --ink-2: #6e6e6e;   /* common name, headings */
+  --ink-2: #6e6e6e;   /* common name, headings, values */
   --ink-3: #555555;   /* body */
-  --ink-4: #404040;   /* sources */
+  --ink-4: #404040;   /* labels, sources */
   --hue: #00e5ff;
   --site: #ffb020;
 }
 html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
 body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink-3); }
 
-#map {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  transition: transform 4s ease;
-}
+#map { position: absolute; inset: 0; width: 100%; height: 100%; transition: transform 4s ease; }
 
 #panel {
-  position: absolute; box-sizing: border-box;
-  transition: transform 6s ease;
+  position: absolute; box-sizing: border-box; transition: transform 6s ease;
   font-size: clamp(12px, 0.9vmin + 4px, 18px); line-height: 1.45;
 }
-body.uw #panel { font-size: clamp(14px, 1.15vmin + 2px, 19px); }
+section { min-width: 0; }
+
 /* Ultrawide: a column on the right, clear of the desktop icons on the left */
-body.uw #panel { top: 0; right: 0; width: 24%; height: 100%; padding: 9vh 3.2vw 6vh 1.6vw;
-  display: flex; flex-direction: column; justify-content: center; gap: 1.6em; }
-/* 16:9: a band along the bottom, in three columns */
-body.hd #panel { left: 0; bottom: 0; width: 100%; height: 22%; padding: 1.6vh 3vw 3.2vh;
-  display: grid; grid-template-columns: 1.3fr 1fr 1.1fr; grid-template-rows: auto auto auto 1fr;
-  column-gap: 3vw; align-content: center; }
-body.hd #eyebrow, body.hd #sci, body.hd #common, body.hd #sentence { grid-column: 1; }
-body.hd .legend { grid-column: 2; grid-row: 1 / span 4; align-self: center; }
-body.hd #arha { grid-column: 3; grid-row: 1 / span 3; }
-body.hd #source { grid-column: 3; grid-row: 4; align-self: end; }
+body.uw #panel { top: 0; right: 0; width: 24%; height: 100%; padding: 6vh 3.2vw 5vh 1.6vw;
+  font-size: clamp(13px, 1.05vmin + 2px, 18px);
+  display: flex; flex-direction: column; justify-content: center; gap: 1.5em; }
+
+/* 16:9: a band along the bottom, in four columns */
+body.hd #panel { left: 0; bottom: 0; width: 100%; height: 22%; padding: 1.4vh 2.5vw 2.4vh;
+  font-size: clamp(11px, 0.75vmin + 3px, 14px); line-height: 1.35;
+  display: grid; grid-template-columns: 1.25fr 1fr 1.3fr 1.1fr; grid-template-rows: auto 1fr;
+  column-gap: 2.2vw; row-gap: 0.5em; align-items: start; }
+body.hd .ident { grid-column: 1; grid-row: 1 / span 2; }
+body.hd .traits { grid-column: 2; grid-row: 1 / span 2; }
+body.hd .charts { grid-column: 3; grid-row: 1; display: flex; gap: 1em; align-items: flex-start; }
+body.hd .legend { grid-column: 3; grid-row: 2; align-self: end; display: flex; flex-wrap: wrap; column-gap: 1.2em; font-size: 0.8em; }
+body.hd .legend .ramp-row, body.hd .legend .ramp-labels { flex-basis: 100%; }
+body.hd .legend .ramp-labels { margin-bottom: 0.3em; }
+body.hd .arha { grid-column: 4; grid-row: 1; }
+body.hd .source { grid-column: 4; grid-row: 2; align-self: end; }
+body.hd .sentence { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+h2, figcaption { margin: 0 0 0.35em; color: var(--ink-2); font-size: 0.78em; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
+figcaption { margin: 0.3em 0 0; font-weight: 400; color: var(--ink-4); }
+figure { margin: 0; }
 
 .eyebrow { color: var(--ink-4); font-size: 0.8em; letter-spacing: 0.08em; text-transform: uppercase; }
 h1 { margin: 0.1em 0 0; color: var(--ink-1); font-weight: 400; font-style: italic; font-size: 2.1em; line-height: 1.1; }
 .common { color: var(--ink-2); font-size: 1.1em; }
 .sentence { margin: 0.5em 0 0; color: var(--ink-3); max-width: 34em; }
-body.hd .sentence { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Life history: label and value pairs */
+.traits dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; column-gap: 1em; row-gap: 0.1em; }
+.traits dt { color: var(--ink-4); }
+.traits dd { margin: 0; color: var(--ink-2); }
+
+/* Seasonality ring beside the importance bars */
+body.uw .charts { display: flex; gap: 1.6em; align-items: flex-start; }
+.season svg { width: 6.5em; height: 6.5em; display: block; }
+body.hd .season svg { width: 4.8em; height: 4.8em; }
+.season text { fill: var(--ink-4); font-size: 7px; text-anchor: middle; dominant-baseline: central; }
+.importance { flex: 1; }
+.bar-row { display: grid; grid-template-columns: 9.5em 1fr 2.6em; align-items: center; column-gap: 0.6em; font-size: 0.85em; }
+.bar-row .lab { color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-row .track { height: 5px; }
+.bar-row .bar { height: 5px; border-radius: 0 3px 3px 0; background: var(--hue); opacity: 0.55; }
+.bar-row .val { color: var(--ink-4); text-align: right; }
 
 .legend { color: var(--ink-3); font-size: 0.85em; }
 .ramp { display: block; height: 6px; width: 18em; max-width: 100%; border-radius: 3px;
@@ -47,8 +72,8 @@ body.hd .sentence { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-ori
 .key { display: flex; align-items: center; gap: 0.6em; }
 .dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,0.5); margin: 0 3px; }
 .ring { width: 7px; height: 7px; border-radius: 50%; border: 1.2px solid var(--site); box-sizing: border-box; }
+.dash { width: 9px; border-top: 1.5px dashed rgba(208,208,208,0.55); }
 
-.arha h2 { margin: 0 0 0.3em; color: var(--ink-2); font-size: 0.8em; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }
 .arha .counts { color: var(--ink-3); }
 .arha ul { margin: 0.4em 0 0; padding: 0; list-style: none; }
 .arha li { color: var(--ink-3); }
@@ -56,3 +81,17 @@ body.hd .sentence { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-ori
 .arha .none { color: var(--ink-4); }
 
 .source { color: var(--ink-4); font-size: 0.75em; line-height: 1.5; }
+
+/* A black fade behind the text so the map recedes there: easier to read, and
+   darker pixels for the OLED */
+body.uw #panel::before, body.hd #panel::before { content: ""; position: absolute; z-index: -1; pointer-events: none; }
+body.uw #panel::before { inset: 0 0 0 -8vw; background: linear-gradient(90deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.82) 32%, rgba(0,0,0,0.9) 100%); }
+body.hd #panel::before { inset: -6vh 0 0 0; background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 35%, rgba(0,0,0,0.92) 100%); }
+
+/* Larger ring with readable month letters; wider importance labels */
+.season svg { width: 8em; height: 8em; }
+body.hd .season svg { width: 6em; height: 6em; }
+.season text { font-size: 9px; }
+.bar-row { grid-template-columns: 11.5em 1fr 2.6em; }
+body.hd .bar-row { grid-template-columns: 10.5em 1fr 2.4em; }
+body.hd .legend .ramp, body.hd .legend .ramp-labels { width: 18em; flex-basis: auto; }

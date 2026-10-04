@@ -23,6 +23,7 @@ coarse <- rast(res = 1)
 limit_m <- access_km * 1000
 
 fits <- list()
+importance <- list()
 for (i in seq_len(nrow(species))) {
   k <- species$speciesKey[i]
   pres <- occ[speciesKey == k]
@@ -75,6 +76,7 @@ for (i in seq_len(nrow(species))) {
   writeRaster(suit, file.path(dir_sdm, paste0(k, ".tif")), overwrite = TRUE)
 
   influence <- summary(fit, n.trees = best_trees, plotit = FALSE)
+  importance[[i]] <- data.table(speciesKey = k, variable = as.character(influence$var), rel_inf = influence$rel.inf)
   fits[[i]] <- data.table(speciesKey = k, n_presences = n_pres, n_background = n_bg, n_target_group = n_target_group,
                           best_trees = best_trees, cv_deviance = min(fit$cv.error),
                           top_predictors = paste(head(as.character(influence$var), 3), collapse = ", "))
@@ -82,4 +84,5 @@ for (i in seq_len(nrow(species))) {
 
 fit_summary <- rbindlist(fits)
 fwrite(fit_summary, file.path(dir_work, "brt_summary.csv"))
+fwrite(rbindlist(importance), file.path(dir_work, "brt_importance.csv"))
 print(fit_summary)

@@ -8,7 +8,7 @@ source(here::here("R", "00_setup.R"))
 
 species <- fread(file.path(dir_work, "species.csv"))
 keep_cols <- c("gbifID", "speciesKey", "species", "countryCode", "decimalLatitude", "decimalLongitude",
-               "coordinateUncertaintyInMeters", "basisOfRecord", "year")
+               "coordinateUncertaintyInMeters", "basisOfRecord", "year", "month")
 
 if (smoke) {
   pieces <- list()

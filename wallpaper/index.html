@@ -9,20 +9,39 @@
 <body>
 <img id="map" alt="">
 <aside id="panel">
-  <div class="eyebrow" id="eyebrow"></div>
-  <h1 id="sci"></h1>
-  <div class="common" id="common"></div>
-  <p class="sentence" id="sentence"></p>
+  <section class="ident">
+    <div class="eyebrow" id="eyebrow"></div>
+    <h1 id="sci"></h1>
+    <div class="common" id="common"></div>
+    <p class="sentence" id="sentence"></p>
+  </section>
 
-  <div class="legend">
+  <section class="traits">
+    <h2>Life history</h2>
+    <dl id="traits"></dl>
+  </section>
+
+  <section class="charts">
+    <figure class="season">
+      <svg id="season" viewBox="-54 -54 108 108" role="img"></svg>
+      <figcaption>Records by month</figcaption>
+    </figure>
+    <figure class="importance">
+      <div id="importance"></div>
+      <figcaption>What the model leaned on</figcaption>
+    </figure>
+  </section>
+
+  <section class="legend">
     <div class="ramp-row"><span class="ramp" id="ramp"></span></div>
     <div class="ramp-labels"><span>low</span><span>modelled relative suitability</span><span>high</span></div>
     <div class="key"><span class="dot"></span>GBIF record, thinned</div>
-    <div class="key"><span class="ring" id="ring"></span>Project ArHa sampling site</div>
-  </div>
+    <div class="key"><span class="ring"></span>Project ArHa sampling site</div>
+    <div class="key" id="rangekey"><span class="dash"></span>IUCN expert range</div>
+  </section>
 
-  <div class="arha" id="arha"></div>
-  <div class="source" id="source"></div>
+  <section class="arha" id="arha"></section>
+  <section class="source" id="source"></section>
 </aside>
 <script src="manifest.js"></script>
 <script src="app.js"></script>
