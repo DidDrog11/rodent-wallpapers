@@ -56,7 +56,10 @@
     $("season").innerHTML = months.map((n, i) =>
       `<path d="${seg(i, 24, 38)}" fill="var(--hue)" fill-opacity="${(0.08 + 0.8 * n / peak).toFixed(2)}"><title>${initials[i]}: ${fmt(n)}</title></path>` +
       `<text x="${(45 * Math.cos(((i + 0.5) / 12) * 2 * Math.PI - Math.PI / 2)).toFixed(1)}" y="${(45 * Math.sin(((i + 0.5) / 12) * 2 * Math.PI - Math.PI / 2)).toFixed(1)}">${initials[i]}</text>`).join("");
-    $("season").setAttribute("aria-label", "Records by month: " + months.map((n, i) => `${initials[i]} ${n}`).join(", "));
+    // This month: the segment outlined in neon red, drawn last so the outline sits on top
+    const thisMonth = now.getMonth();
+    $("season").insertAdjacentHTML("beforeend", `<path class="now" d="${seg(thisMonth, 24, 38)}"><title>This month</title></path>`);
+    $("season").setAttribute("aria-label", "Records by month: " + months.map((n, i) => `${initials[i]} ${n}`).join(", ") + `; this month is ${initials[thisMonth]}`);
     document.querySelector(".season").style.display = months.some((n) => n > 0) ? "" : "none";
 
     // Variable importance: one series, bars scaled to the largest

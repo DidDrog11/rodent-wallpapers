@@ -111,3 +111,7 @@ body.hd #silhouette { height: 3em; margin-bottom: 0.3em; }
 
 .replay { color: var(--ink-4); margin-top: 0.4em; min-height: 1.4em; font-variant-numeric: tabular-nums; }
 #globe { border-radius: 50%; overflow: hidden; }
+
+/* The current month on the seasonality ring */
+.season path.now { fill: none; stroke: #ff3b1f; stroke-width: 1.6; stroke-linejoin: round; filter: drop-shadow(0 0 1.5px #ff3b1f); }
+.now-key { display: inline-block; width: 0.7em; height: 0.45em; border: 1.3px solid #ff3b1f; border-radius: 1px; margin-right: 0.3em; vertical-align: baseline; }

@@ -19,11 +19,11 @@ species <- fread(file.path(dir_work, "species.csv"))
 occ <- readRDS(file.path(dir_work, "occurrences_thinned.rds"))
 sites <- fread(file.path(dir_work, "arha_sites.csv"))
 countries <- vect(file.path(dir_pred, "gadm_countries.gpkg"))
-hillshade <- rast(file.path(dir_pred, "hillshade.tif"))
+hillshade <- rast(file.path(dir_pred, "hillshade_z8.tif"))
 iucn_file <- file.path(dir_work, "iucn_ranges.gpkg")
 iucn <- if (file.exists(iucn_file)) vect(iucn_file) else NULL
 
-land_level <- 0.035        # land brightness on the black ocean
+land_level <- 0.04         # land brightness on flat ground; slopes run from about a sixth to two and a half times this
 flat_shade <- sin(40 * pi / 180)  # hillshade of flat ground for a 40-degree sun
 coast_tint <- c(0.012, 0.022, 0.05)  # faint deep blue in the sea near coasts
 border_colour <- "#2b2b2b"
@@ -110,7 +110,7 @@ compose_panel <- function(suit, crs_map, panel_ext, w, h, borders, hue_rgb, mask
   land <- rasterize(borders, tmpl, field = 1, background = 0)
   coast <- blur(land, tmpl, 3) * (1 - land)
   if (!is.null(inside)) coast <- coast * inside
-  relief <- clamp(subst(project(hillshade, tmpl, method = "bilinear"), NA, flat_shade) / flat_shade, 0.4, 1.6)
+  relief <- clamp(subst(project(hillshade, tmpl, method = "bilinear"), NA, flat_shade) / flat_shade, 0.15, 2.6)
 
   v <- values(s_map, mat = FALSE)
   g <- values(glow, mat = FALSE)
@@ -119,10 +119,11 @@ compose_panel <- function(suit, crs_map, panel_ext, w, h, borders, hue_rgb, mask
   rl <- values(relief, mat = FALSE)
   a <- v^1.4
   white <- 0.65 * v^5
+  lit <- pmin(1.25, 0.62 + 0.38 * rl)   # the glow takes the terrain light too, so mountains show through it
   rgb_vals <- matrix(0, nrow = length(v), ncol = 3)
   for (ch in 1:3) {
     base <- land_level * l * rl + coast_tint[ch] * co
-    rgb_vals[, ch] <- pmin(1, base * (1 - a) + (hue_rgb[ch] * (1 - white) + white) * a + hue_rgb[ch] * g * 0.5)
+    rgb_vals[, ch] <- pmin(1, base * (1 - a) + (hue_rgb[ch] * (1 - white) + white) * a * lit + hue_rgb[ch] * g * 0.5)
   }
   rgb_map <- rast(tmpl, nlyrs = 3)
   values(rgb_map) <- rgb_vals * 255
