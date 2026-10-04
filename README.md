@@ -15,7 +15,7 @@ Run `run_pipeline.cmd` on the PC, or `run_pipeline.cmd smoke` for a two-species 
 | `R/04_thin.R` | Drops unplaceable, imprecise, fossil and captive records; keeps 20% per species and country; then one record per grid cell |
 | `R/05_brt.R` | One boosted regression tree per species |
 | `R/06_arha.R` | Studies, tests, detections and sampling sites from the latest Project ArHa database; IUCN outlines and COMBINE life history from the ArHa repositories (all read only) |
-| `R/07_wikipedia.R` | Common name, link and first sentence from Wikipedia |
+| `R/07_web.R` | Wikipedia name, link, sentence and image; iNaturalist photos for the card; PhyloPic silhouette |
 | `R/08_render.R` | One image per species for each screen shape |
 | `R/09_build_wallpaper.R` | Assembles the Wallpaper Engine project in `output/full/` |
 
@@ -44,6 +44,16 @@ Land is shaded by terrain from the elevation layer, and the sea carries a faint 
 Colour follows family: squirrels cyan, cricetids violet, murids magenta, beavers blue, others mint.
 
 The text panel adds life history from COMBINE (reported values only; Soria et al. 2021), records by calendar month from the cleaned GBIF records, and the six predictors the model leaned on most, by relative influence.
+
+## Motion
+
+The page draws the thinned GBIF records itself, from screen positions written by `R/08_render.R`. A few seconds after loading, and every ten minutes after that, it clears them and replays them oldest first over about 50 seconds, each flaring briefly in the species' hue, with a counter showing the year reached. Between replays nothing moves, so the GPU idles.
+
+Species shown in regional panels get a spinning globe in the corner of the main panel: 48 orthographic views pre-rendered in R into one sprite, cross-faded every 2.5 seconds, one turn every two minutes.
+
+A PhyloPic silhouette sits above the species name: the species' own if PhyloPic has one, else its genus's, else its family's (CC0, public domain or CC BY only). The credit line names the taxon drawn when it is not the species itself.
+
+Open `index.html?species=N` in a browser to preview species N; Wallpaper Engine never passes that.
 
 ## Rodent of the day card
 

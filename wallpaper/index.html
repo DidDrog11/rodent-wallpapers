@@ -7,9 +7,15 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<img id="map" alt="">
+<div id="stage">
+  <img id="map" alt="">
+  <canvas id="dots"></canvas>
+  <canvas id="flares"></canvas>
+  <div id="globe"><div class="frame a"></div><div class="frame b"></div></div>
+</div>
 <aside id="panel">
   <section class="ident">
+    <img id="silhouette" alt="">
     <div class="eyebrow" id="eyebrow"></div>
     <h1 id="sci"></h1>
     <div class="common" id="common"></div>
@@ -38,11 +44,13 @@
     <div class="key"><span class="dot"></span>GBIF record, thinned</div>
     <div class="key"><span class="ring"></span>Project ArHa sampling site</div>
     <div class="key" id="rangekey"><span class="dash"></span>IUCN expert range</div>
+    <div class="replay" id="replay"></div>
   </section>
 
   <section class="arha" id="arha"></section>
   <section class="source" id="source"></section>
 </aside>
+<script src="screens.js"></script>
 <script src="manifest.js"></script>
 <script src="app.js"></script>
 </body>

@@ -1,6 +1,7 @@
 # Render one map image per species and screen: pure black, dim GADM country
-# borders, modelled suitability as a neon glow, thinned GBIF records as faint
-# dots and Project ArHa sampling sites as amber rings. Text other than panel
+# borders, modelled suitability as a neon glow and Project ArHa sampling sites
+# as amber rings. Records are not drawn: their screen positions are written for
+# the page, which draws and replays them by year. Text other than panel
 # labels is not drawn here; the wallpaper page lays it over the image so it
 # can move.
 #
@@ -31,6 +32,7 @@ frame_colour <- "#1c1c1c"
 label_colour <- "#6e6e6e"
 gap_px <- 24               # space between panels and round the edge
 eqearth <- "+proj=eqearth +lon_0=0 +datum=WGS84 +units=m"
+earth_radius <- 6378137
 globe <- densify(as.polygons(ext(-180, 180, -90, 90), crs = "EPSG:4326"), 100000)
 
 # A centred equal-area projection
@@ -93,17 +95,21 @@ blur <- function(x, tmpl, sigma_cells) {
 # Colour one panel: land a shade above black and lit by the terrain, a faint
 # blue haze in the sea along coasts, suitability in the hue rising to near
 # white at the top of the scale, and a halo in the hue from a blurred copy
-compose_panel <- function(suit, crs_map, panel_ext, w, h, borders, hue_rgb, mask_globe = FALSE) {
+compose_panel <- function(suit, crs_map, panel_ext, w, h, borders, hue_rgb, mask = "none") {
   tmpl <- rast(panel_ext, ncols = w, nrows = h, crs = crs_map)
   s_map <- subst(project(suit, tmpl, method = "bilinear"), NA, 0)
-  inside <- if (mask_globe) rasterize(project(globe, crs_map), tmpl, background = 0) else NULL
   # Outside the Equal Earth outline the inverse projection wraps round and
-  # would paint a second copy of the range
-  if (mask_globe) s_map <- s_map * inside
+  # would paint a second copy of the range; outside a globe's disc there is
+  # nothing to paint
+  inside <- switch(mask,
+                   eqearth = rasterize(project(globe, crs_map), tmpl, background = 0),
+                   disc = (init(tmpl, "x")^2 + init(tmpl, "y")^2) <= earth_radius^2,
+                   NULL)
+  if (!is.null(inside)) s_map <- s_map * inside
   glow <- blur(s_map, tmpl, 2)
   land <- rasterize(borders, tmpl, field = 1, background = 0)
   coast <- blur(land, tmpl, 3) * (1 - land)
-  if (mask_globe) coast <- coast * inside
+  if (!is.null(inside)) coast <- coast * inside
   relief <- clamp(subst(project(hillshade, tmpl, method = "bilinear"), NA, flat_shade) / flat_shade, 0.4, 1.6)
 
   v <- values(s_map, mat = FALSE)
@@ -139,6 +145,39 @@ draw_panel <- function(rgb_map, rect, W, H, borders, pres_v, site_v, site_cex, l
     text(usr[1] + 0.025 * (usr[2] - usr[1]), usr[4] - 0.03 * (usr[4] - usr[3]), label, adj = c(0, 1),
          col = label_colour, cex = 1.15 * H / 1080, family = "Segoe UI")
   }
+}
+
+# Screen pixel positions and years of the records drawn in a panel. The page
+# draws the records itself, so it can replay them by year.
+points_on_screen <- function(pts_v, panel_ext, rect) {
+  xy <- crds(pts_v)
+  px <- rect$x0 + (xy[, 1] - panel_ext$xmin) / (panel_ext$xmax - panel_ext$xmin) * rect$w
+  py <- rect$y0 + (panel_ext$ymax - xy[, 2]) / (panel_ext$ymax - panel_ext$ymin) * rect$h
+  keep <- is.finite(px) & is.finite(py) & px >= rect$x0 & px < rect$x0 + rect$w & py >= rect$y0 & py < rect$y0 + rect$h
+  data.table(x = round(px[keep], 1), y = round(py[keep], 1), year = pts_v$year[keep])
+}
+
+# A spinning globe for species shown in panels: globe_frames orthographic
+# views round the world, packed in a grid sprite the page steps through.
+# Borders are cut to the visible hemisphere before projecting.
+render_globe <- function(suit, hue_rgb, lat0, file) {
+  rows <- ceiling(globe_frames / globe_cols)
+  W <- globe_cols * globe_px
+  H <- rows * globe_px
+  r <- earth_radius * 1.03
+  rim <- seq(0, 2 * pi, length.out = 240)
+  ragg::agg_png(file, width = W, height = H, units = "px", background = "black")
+  for (f in seq_len(globe_frames)) {
+    lon0 <- 180 - (f - 1) * 360 / globe_frames   # centre moves west, so the Earth turns eastward as it does
+    crs_o <- sprintf("+proj=ortho +lat_0=%d +lon_0=%.1f +datum=WGS84 +units=m", round(lat0), lon0)
+    hemisphere <- buffer(vect(cbind(lon0, lat0), crs = "EPSG:4326"), width = 9.6e6)
+    borders <- project(crop(countries, hemisphere), crs_o)
+    rgb_globe <- compose_panel(suit, crs_o, ext(-r, r, -r, r), globe_px, globe_px, borders, hue_rgb, mask = "disc")
+    rect_f <- list(x0 = ((f - 1) %% globe_cols) * globe_px, y0 = ((f - 1) %/% globe_cols) * globe_px, w = globe_px, h = globe_px)
+    draw_panel(rgb_globe, rect_f, W, H, borders, NULL, NULL, 0, first = (f == 1))
+    lines(earth_radius * cos(rim), earth_radius * sin(rim), col = "#2a2a2a", lwd = 1)
+  }
+  dev.off()
 }
 
 # Panel rectangles inside the map part of the screen: one large panel on the
@@ -223,6 +262,13 @@ for (i in seq_len(nrow(species))) {
     projection_label <- regions[[1]]$projection_label
   }
 
+  # The spinning globe replaces the static world inset for species in panels
+  globe_file <- NA_character_
+  if (layout_mode == "panels") {
+    globe_file <- file.path(dir_img, paste0("globe_", k, ".png"))
+    render_globe(suit, hue_rgb, max(-30, min(40, mean(pres_dt$lat))), globe_file)
+  }
+
   for (scr in names(screens)) {
     s <- screens[[scr]]
     W <- s$width
@@ -233,6 +279,8 @@ for (i in seq_len(nrow(species))) {
                      h = if (s$text_side == "bottom") round(H * (1 - s$text_share)) else H)
     img_file <- file.path(dir_img, paste0(k, "_", scr, ".png"))
     ragg::agg_png(img_file, width = W, height = H, units = "px", background = "black")
+    on_screen <- list()
+    globe_rect <- NULL
 
     if (layout_mode != "panels") {
       # One map over the whole screen, with the species (or the world) fitted
@@ -246,13 +294,15 @@ for (i in seq_len(nrow(species))) {
       } else {
         ext(fitted$xmin, fitted$xmax, fitted$ymax - H * px, fitted$ymax)
       }
+      full_rect <- list(x0 = 0, y0 = 0, w = W, h = H)
       borders <- borders_for(reg$crs, reg$window)
-      rgb_map <- compose_panel(suit, reg$crs, screen_ext, W, H, borders, hue_rgb, mask_globe = is_world)
-      draw_panel(rgb_map, list(x0 = 0, y0 = 0, w = W, h = H), W, H, borders, project(pres_ll, reg$crs),
+      rgb_map <- compose_panel(suit, reg$crs, screen_ext, W, H, borders, hue_rgb, mask = if (is_world) "eqearth" else "none")
+      draw_panel(rgb_map, full_rect, W, H, borders, NULL,
                  if (is.null(site_ll)) NULL else project(site_ll, reg$crs), site_cex, first = TRUE,
                  range_v = project_for(range_ll, reg$crs, reg$window))
+      on_screen[[1]] <- points_on_screen(project(pres_ll, reg$crs), screen_ext, full_rect)
     } else {
-      # A panel per region, then the world inset in the main panel's corner
+      # A panel per region, and a place for the globe in the main panel's corner
       rects <- layout_panels(length(regions), map_area)
       for (j in seq_along(regions)) {
         reg <- regions[[j]]
@@ -260,24 +310,33 @@ for (i in seq_len(nrow(species))) {
         panel_ext <- fit_extent(reg$focus, rect_j$w, rect_j$h, 0.08)
         borders <- borders_for(reg$crs, reg$window)
         rgb_map <- compose_panel(suit, reg$crs, panel_ext, rect_j$w, rect_j$h, borders, hue_rgb)
-        draw_panel(rgb_map, rect_j, W, H, borders, project(pres_ll, reg$crs),
+        draw_panel(rgb_map, rect_j, W, H, borders, NULL,
                    if (is.null(site_ll)) NULL else project(site_ll, reg$crs), site_cex,
                    label = reg$label, frame = TRUE, first = (j == 1), range_v = project_for(range_ll, reg$crs, reg$window))
+        on_screen[[j]] <- points_on_screen(project(pres_ll, reg$crs), panel_ext, rect_j)
       }
       main <- rects[[1]]
-      inset_w <- round(main$w * 0.3)
-      inset_h <- round(inset_w / 2.05)
-      inset <- list(x0 = main$x0 + gap_px, y0 = main$y0 + main$h - inset_h - gap_px, w = inset_w, h = inset_h)
-      world_ext <- fit_extent(ext(project(globe, eqearth)), inset_w, inset_h, 0.02, min_span = 0)
-      world_borders <- borders_for(eqearth)
-      rgb_world <- compose_panel(suit, eqearth, world_ext, inset_w, inset_h, world_borders, hue_rgb, mask_globe = TRUE)
-      draw_panel(rgb_world, inset, W, H, world_borders, NULL, NULL, site_cex, frame = TRUE)
+      side <- round(min(main$w * 0.26, main$h * 0.4))
+      globe_rect <- list(x = main$x0 + gap_px, y = main$y0 + main$h - side - gap_px, size = side)
     }
     dev.off()
 
+    # Records for the page to draw and replay, oldest first
+    pts <- rbindlist(on_screen)[order(year, na.last = FALSE)]
+    pts_file <- file.path(dir_out, "pts", paste0(k, "_", scr, ".js"))
+    dir.create(dirname(pts_file), showWarnings = FALSE)
+    writeLines(sprintf('window.RODENT_POINTS = {x: [%s], y: [%s], year: [%s]};',
+                       paste(pts$x, collapse = ","), paste(pts$y, collapse = ","),
+                       paste(ifelse(is.na(pts$year), "null", pts$year), collapse = ",")), pts_file)
+
     renders[[length(renders) + 1]] <- data.table(speciesKey = k, screen = scr, image = file.path("img", basename(img_file)),
+                                                 points = file.path("pts", basename(pts_file)),
                                                  hue = hue, projection = projection_label,
-                                                 has_range = !is.null(range_ll) && nrow(range_ll) > 0)
+                                                 has_range = !is.null(range_ll) && nrow(range_ll) > 0,
+                                                 globe = if (is.na(globe_file)) NA_character_ else file.path("img", basename(globe_file)),
+                                                 globe_x = if (is.null(globe_rect)) NA else globe_rect$x,
+                                                 globe_y = if (is.null(globe_rect)) NA else globe_rect$y,
+                                                 globe_size = if (is.null(globe_rect)) NA else globe_rect$size)
   }
   message("Rendered ", species$species[i], ": ", projection_label)
 }

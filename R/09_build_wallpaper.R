@@ -18,6 +18,11 @@ importance <- fread(file.path(dir_work, "brt_importance.csv"))
 seasonality <- fread(file.path(dir_work, "seasonality.csv"))
 traits <- fread(file.path(dir_work, "traits.csv"))
 doi <- readLines(file.path(dir_work, "gbif_doi.txt"))[1]
+web <- readRDS(file.path(dir_work, "web.rds"))
+
+# Years the records span, for the replay counter
+occ <- readRDS(file.path(dir_work, "occurrences_thinned.rds"))
+occ_years <- split(occ$year, occ$speciesKey)
 
 entries <- list()
 for (i in seq_len(nrow(species))) {
@@ -49,6 +54,13 @@ for (i in seq_len(nrow(species))) {
     importance = top_importance, months = months,
     traits = lapply(seq_len(nrow(tr)), function(j) list(label = tr$label[j], value = tr$value[j])),
     images = as.list(setNames(r$image, r$screen)),
+    points = as.list(setNames(r$points, r$screen)),
+    year_range = range(occ_years[[as.character(k)]], na.rm = TRUE),
+    globe = if (is.na(r$globe[1])) NULL else list(
+      sprite = r$globe[1], frames = globe_frames, cols = globe_cols, frame_px = globe_px,
+      place = lapply(setNames(seq_len(nrow(r)), r$screen), function(j) list(x = r$globe_x[j], y = r$globe_y[j], size = r$globe_size[j]))),
+    silhouette = web[[as.character(k)]]$silhouette,
+    card_images = list(wikipedia = web[[as.character(k)]]$wiki_image, inaturalist = web[[as.character(k)]]$inat_photos),
     arha = list(studies = a$arha_studies, individuals = a$arha_individuals, tested = a$arha_tested,
                 positive = a$arha_positive,
                 detections = lapply(seq_len(nrow(d)), function(j) as.list(d[j, .(pathogen, n_positive, assays)]))))
@@ -62,6 +74,9 @@ writeLines(c("window.RODENTS = ", manifest_json, ";"), file.path(dir_out, "manif
 
 # The page itself, and a preview image for Wallpaper Engine's browser
 file.copy(list.files(here("wallpaper"), full.names = TRUE), dir_out, overwrite = TRUE)
+# Screen sizes the images were drawn for, so the page can scale positions
+writeLines(sprintf("window.RODENT_SCREENS = %s;", jsonlite::toJSON(lapply(screens, function(s) s[c("width", "height")]), auto_unbox = TRUE)),
+           file.path(dir_out, "screens.js"))
 file.copy(file.path(dir_out, renders[screen == "hd"]$image[1]), file.path(dir_out, "preview.png"), overwrite = TRUE)
 
 message("Wallpaper written to ", dir_out)

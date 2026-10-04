@@ -65,3 +65,9 @@ dir_img <- file.path(dir_out, "img")
 for (d in c(dir_work, dir_gbif, dir_sdm, dir_pred, dir_out, dir_img)) dir.create(d, recursive = TRUE, showWarnings = FALSE)
 
 set.seed(20261004)
+
+# Spinning globe for species shown in regional panels: frames round the
+# world, each frame_px square, packed globe_cols to a row of the sprite
+globe_frames <- 48
+globe_px <- 320
+globe_cols <- 8
