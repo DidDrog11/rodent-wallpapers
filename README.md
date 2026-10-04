@@ -2,6 +2,17 @@
 
 A desktop wallpaper that shows one rodent species a day: a simple modelled distribution from GBIF records, drawn as a neon glow on a black map, with what Project ArHa knows about the species as an arenavirus or hantavirus host. It is a visualisation, not an analysis. The models are fitted with fixed settings and nobody checks them species by species.
 
+![Bank vole on a 3440 x 1440 screen](docs/previews/bank-vole-ultrawide.png)
+
+| | |
+|---|---|
+| ![North American beaver, with its introduced populations in Patagonia and Finland and a turning globe](docs/previews/north-american-beaver-ultrawide.png) | ![Alpine marmot, with terrain relief in the Alps](docs/previews/alpine-marmot-ultrawide.png) |
+| North American beaver: regional panels for its introductions, and a turning globe | Alpine marmot: terrain relief through the glow |
+
+![Hazel dormouse on a 1920 x 1080 screen](docs/previews/hazel-dormouse-hd.png)
+
+Previews are at half resolution and show species without IUCN range outlines, which may not be redistributed. Occurrence data: GBIF.org (2026) GBIF Occurrence Download https://doi.org/10.15468/dl.5as4v9. Climate: WorldClim 2.1. Borders: GADM. Life history: COMBINE (Soria et al. 2021). Silhouettes: PhyloPic, credited on each image.
+
 ## Pipeline
 
 Run `run_pipeline.cmd` on the PC, or `run_pipeline.cmd smoke` for a two-species test. Each script logs to `logs/`.
