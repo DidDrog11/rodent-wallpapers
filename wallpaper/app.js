@@ -5,6 +5,11 @@
   const data = window.RODENTS;
   const $ = (id) => document.getElementById(id);
   const fmt = (n) => (n == null ? "0" : Number(n).toLocaleString("en-GB"));
+  // Wallpaper Engine tells the page when it pauses it (a window covers the
+  // desktop). document.hidden is no guide there: it may stay true while the
+  // wallpaper is on screen, which would stop the replay and the globes.
+  let paused = false;
+  window.wallpaperPropertyListener = Object.assign(window.wallpaperPropertyListener || {}, { setPaused: (p) => { paused = !!p; } });
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
   // Small cycles of offsets in pixels, one step per hour
@@ -161,13 +166,14 @@
   // way through, the replay catches up when it resumes; a watchdog finishes
   // any replay that has stalled. Between replays nothing is redrawn.
   function replay() {
-    if (!pts || run || document.hidden) return;
+    if (!pts || run || paused) return;
     const dots = dotsContext(true);
     const n = pts.x.length;
     let undated = 0;
     while (undated < n && pts.year[undated] == null) dot(dots, undated++);
     run = { id: ++runs, start: performance.now(), drawn: undated, undated, active: [] };
-    requestAnimationFrame((t) => frame(t, run.id));
+    const id = run.id;
+    setTimeout(() => frame(performance.now(), id), 50);
   }
 
   function finish(id) {
@@ -179,11 +185,11 @@
     setTimeout(() => { if (!run) $("replay").textContent = ""; }, 6000);
   }
 
-  let lastFrame = 0;
+
   function frame(t, id) {
     if (!run || run.id !== id) return;   // a newer replay or a new species took over
-    if (t - lastFrame < 50) { requestAnimationFrame((u) => frame(u, id)); return; }   // about 20 frames a second
-    lastFrame = t;
+
+
     const n = pts.x.length, elapsed = t - run.start;
     if (elapsed > REPLAY_MS + FLARE_MS) { finish(id); return; }   // resumed after a long pause: just complete it
     const target = Math.min(n, run.undated + Math.floor((n - run.undated) * elapsed / REPLAY_MS));
@@ -204,7 +210,7 @@
     });
     flares.globalAlpha = 1;
     if (run.drawn > run.undated) $("replay").textContent = `Records appearing by year · ${pts.year[run.drawn - 1]}`;
-    if (run.drawn < n || run.active.length) { requestAnimationFrame((u) => frame(u, id)); return; }
+    if (run.drawn < n || run.active.length) { setTimeout(() => frame(performance.now(), id), 50); return; }   // about 20 steps a second
     finish(id);
   }
 
@@ -233,7 +239,7 @@
     frames[0].style.opacity = 1;
     frames[1].style.opacity = 0;
     globeTimer = setInterval(() => {
-      if (document.hidden) return;
+      if (paused) return;
       i = (i + 1) % g.frames;
       const next = frames[1 - front];
       next.style.backgroundPosition = position(i);
@@ -263,7 +269,7 @@
     let preload = new Image();
     preload.src = g.frames[(i + 1) % g.frames.length];
     bigTimer = setInterval(() => {
-      if (document.hidden) return;
+      if (paused) return;
       i = (i + 1) % g.frames.length;
       const next = views[1 - front];
       next.onload = () => { next.style.opacity = 1; views[front].style.opacity = 0; front = 1 - front; next.onload = null; };
